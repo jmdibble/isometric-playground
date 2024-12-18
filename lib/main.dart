@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
-import 'package:flame_isometric/custom_isometric_tile_map_component.dart';
-import 'package:flame_isometric/flame_isometric.dart';
+import 'package:flame/sprite.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:isometric_playground/firebase_options.dart';
@@ -51,10 +50,7 @@ class App extends StatelessWidget {
       title: 'Isometric Playground',
       theme: theme,
       home: SelectionArea(
-        child: MultiBlocProvider(
-          providers: [],
-          child: MainGamePage(),
-        ),
+        child: MainGamePage(),
       ),
     );
   }
@@ -68,52 +64,105 @@ class MainGamePage extends StatefulWidget {
 }
 
 class MainGameState extends State<MainGamePage> {
-  MainGame game = MainGame();
+  int numberOfRows = 3;
 
   @override
   Widget build(BuildContext context) {
+    IsometricTileMapExample isoExample = IsometricTileMapExample(numberOfRows);
+
     return Scaffold(
-        body: Stack(
-      children: [
-        GameWidget(game: game),
-      ],
-    ));
+      body: Stack(
+        children: [
+          GameWidget(
+            game: isoExample,
+            loadingBuilder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  FloatingActionButton(
+                    backgroundColor: Colors.redAccent,
+                    onPressed: () {
+                      setState(() {
+                        if (numberOfRows > 1) numberOfRows--;
+                      });
+                    },
+                    child: const Icon(Icons.remove),
+                  ),
+                  FloatingActionButton(
+                    backgroundColor: Colors.greenAccent,
+                    onPressed: () {
+                      setState(() {
+                        if (numberOfRows < 10) numberOfRows++;
+                      });
+                    },
+                    child: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class MainGame extends FlameGame with HasGameRef {
+class IsometricTileMapExample extends FlameGame {
+  IsometricTileMapExample(this.numberOfRows);
+
+  final int numberOfRows;
+
+  late IsometricTileMapComponent base;
+
   @override
   Future<void> onLoad() async {
-    super.onLoad();
-    final gameSize = gameRef.size;
-    // single
-    // final flameIsometric = await FlameIsometric.create(
-    //     tileMap: 'tile_map.png', tmx: 'tiles/tile_map.tmx');
-    //
-    // for (var i = 0; i < flameIsometric.layerLength; i++) {
-    //   add(
-    //     IsometricTileMapComponent(
-    //       flameIsometric.tileset,
-    //       flameIsometric.renderMatrixList[i],
-    //       destTileSize: flameIsometric.srcTileSize,
-    //       position:
-    //           Vector2(gameSize.x / 2, flameIsometric.tileHeight.toDouble()),
-    //     ),
-    //   );
-    // }
+    // Creates a tileset, the block ids are automatically assigned sequentially
+    // starting at 0, from left to right and then top to bottom.
+    final tilesetImage = await images.load('grass.png');
+    final tileset = SpriteSheet(
+      image: tilesetImage,
+      srcSize: Vector2(64, 64),
+    );
 
-    final flameIsometric =
-        await FlameIsometric.create(tileMap: ['assets/images/Grass.png'], tmx: 'assets/tmx/base_grass.tmx');
+    final treeSprite = await images.load('tree_64.png');
+    final tree = Sprite(treeSprite);
 
-    for (var renderLayer in flameIsometric.renderLayerList) {
-      add(
-        CustomIsometricTileMapComponent(
-          renderLayer.spriteSheet,
-          renderLayer.matrix,
-          destTileSize: flameIsometric.srcTileSize,
-          position: Vector2(gameSize.x / 2, flameIsometric.tileHeight.toDouble()),
+    ///
+    /// [0, 0, 0]
+    /// [0, 0, 0]
+    /// [0, 0, 0]
+    ///
+    final matrix = [
+      ...List.generate(
+        numberOfRows,
+        (i) => List.generate(
+          numberOfRows,
+          (j) => 0,
         ),
-      );
-    }
+      ),
+    ];
+
+    add(
+      IsometricTileMapComponent(
+        tileset,
+        matrix,
+        anchor: Anchor.center,
+        position: size / 2,
+      ),
+    );
+    add(
+      SpriteComponent(
+        sprite: tree,
+        anchor: Anchor.bottomCenter,
+        position: Vector2(size.x / 2, size.y / 2 - 10),
+      ),
+    );
   }
 }
