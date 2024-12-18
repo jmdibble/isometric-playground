@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flame/components.dart';
+import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flame/sprite.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +72,7 @@ class MainGameState extends State<MainGamePage> {
     IsometricTileMapExample isoExample = IsometricTileMapExample(numberOfRows);
 
     return Scaffold(
+      appBar: AppBar(),
       body: Stack(
         children: [
           GameWidget(
@@ -131,8 +133,8 @@ class IsometricTileMapExample extends FlameGame {
       srcSize: Vector2(64, 64),
     );
 
-    final treeSprite = await images.load('tree_64.png');
-    final tree = Sprite(treeSprite);
+    final treeImage = await images.load('tree_64.png');
+    final tree = Sprite(treeImage);
 
     ///
     /// [0, 0, 0]
@@ -149,20 +151,87 @@ class IsometricTileMapExample extends FlameGame {
       ),
     ];
 
-    add(
-      IsometricTileMapComponent(
+    final middle = size / 2;
+
+    addAll([
+      base = IsometricTileMapComponent(
         tileset,
         matrix,
+        position: middle,
         anchor: Anchor.center,
-        position: size / 2,
       ),
-    );
-    add(
-      SpriteComponent(
-        sprite: tree,
-        anchor: Anchor.bottomCenter,
-        position: Vector2(size.x / 2, size.y / 2 - 10),
+      DraggableTree(
+        numberOfRows.isEven ? middle : Vector2(middle.x, middle.y - 16),
+        tree,
+        numberOfRows,
+        snapToGrid: (Vector2 position) {
+          print('position: $position');
+          final block = base.getBlock(position);
+          print('block: $block');
+          if ((block.x + 1).abs() <= numberOfRows && (block.y + 1).abs() <= numberOfRows) {
+            final vector = base.getBlockCenterPosition(block);
+            print('vector: $vector');
+            return Vector2(middle.x + vector.x, middle.y + vector.y - 16);
+          } else {
+            return numberOfRows.isEven ? middle : Vector2(middle.x, middle.y - 16);
+          }
+        },
       ),
-    );
+      // DraggableTree(
+      //   numberOfRows.isEven ? middle : Vector2(middle.x, middle.y - 16),
+      //   tree,
+      //   numberOfRows,
+      //   snapToGrid: (Vector2 position) {
+      //     print('position: $position');
+      //     final block = base.getBlock(position);
+      //     print('block: $block');
+      //     final vector = base.getBlockCenterPosition(block);
+      //     print('vector: $vector');
+      //     return vector;
+      //   },
+      //   snapToCenterTile: () {
+      //     return numberOfRows.isEven ? middle : Vector2(middle.x, middle.y - 16);
+      //   },
+      // ),
+    ]);
+  }
+}
+
+class DraggableTree extends SpriteComponent with DragCallbacks {
+  DraggableTree(
+    Vector2 position,
+    Sprite sprite,
+    this.numberOfRows, {
+    required this.snapToGrid,
+  }) : super(
+          sprite: sprite,
+          position: position,
+          anchor: Anchor.bottomCenter,
+        );
+
+  final int numberOfRows;
+  final Function(Vector2) snapToGrid;
+
+  @override
+  void onDragStart(DragStartEvent event) {
+    super.onDragStart(event);
+    priority = 10;
+  }
+
+  @override
+  void onDragUpdate(DragUpdateEvent event) {
+    super.onDragUpdate(event);
+    position += event.localDelta;
+  }
+
+  @override
+  void onDragEnd(DragEndEvent event) {
+    print('onDragEnd');
+    super.onDragEnd(event);
+    priority = 0;
+
+    final nearestTile = snapToGrid(position);
+
+    position = nearestTile;
   }
 }
